@@ -31,6 +31,9 @@ export default function Maqsadlar() {
     localStorage.setItem("nafs-goals", JSON.stringify(goals));
   }, [goals]);
 
+  const [addingSubtaskTo, setAddingSubtaskTo] = useState<string | null>(null);
+  const [subtaskText, setSubtaskText] = useState("");
+
   const addGoal = (parentId?: string) => {
     if (!newGoalTitle.trim()) return;
 
@@ -58,6 +61,32 @@ export default function Maqsadlar() {
 
     setNewGoalTitle("");
     toast.success("Maqsad qo'shildi!");
+  };
+
+  const addSubtask = (parentId: string) => {
+    if (!subtaskText.trim()) return;
+
+    const newSubtask: Goal = {
+      id: Date.now().toString(),
+      title: subtaskText,
+      completed: false,
+      children: [],
+      expanded: false,
+    };
+
+    const addToParent = (items: Goal[]): Goal[] => {
+      return items.map((item) => {
+        if (item.id === parentId) {
+          return { ...item, children: [...item.children, newSubtask], expanded: true };
+        }
+        return { ...item, children: addToParent(item.children) };
+      });
+    };
+
+    setGoals(addToParent(goals));
+    setSubtaskText("");
+    setAddingSubtaskTo(null);
+    toast.success("Podзадача qo'shildi!");
   };
 
   const toggleGoal = (id: string) => {
@@ -166,21 +195,21 @@ export default function Maqsadlar() {
                 <button
                   onClick={() => startEdit(goal.id, goal.title)}
                   className="text-muted-foreground hover:text-primary"
+                  title="Tahrirlash"
                 >
                   <Edit className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => deleteGoal(goal.id)}
                   className="text-muted-foreground hover:text-destructive"
+                  title="O'chirish"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => {
-                    setNewGoalTitle("");
-                    setTimeout(() => addGoal(goal.id), 0);
-                  }}
+                  onClick={() => setAddingSubtaskTo(goal.id)}
                   className="text-muted-foreground hover:text-primary"
+                  title="Podzadacha qo'shish"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -188,6 +217,40 @@ export default function Maqsadlar() {
             )}
           </div>
         </Card>
+
+        {addingSubtaskTo === goal.id && (
+          <Card className="ml-6 mt-2 p-3 shadow-soft">
+            <div className="flex gap-2">
+              <Input
+                value={subtaskText}
+                onChange={(e) => setSubtaskText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addSubtask(goal.id);
+                  if (e.key === "Escape") {
+                    setAddingSubtaskTo(null);
+                    setSubtaskText("");
+                  }
+                }}
+                placeholder="Podzadacha kiriting..."
+                className="flex-1"
+                autoFocus
+              />
+              <Button size="sm" onClick={() => addSubtask(goal.id)}>
+                <Check className="w-4 h-4" />
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => {
+                  setAddingSubtaskTo(null);
+                  setSubtaskText("");
+                }}
+              >
+                ×
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {goal.expanded && goal.children.map((child) => renderGoal(child, level + 1))}
       </div>

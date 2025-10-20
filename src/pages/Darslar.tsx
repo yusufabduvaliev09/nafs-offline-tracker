@@ -12,14 +12,25 @@ interface Lesson {
   time: string;
   topic: string;
   completed: boolean;
+  days: number[]; // 0 = Воскресенье, 1 = Понедельник, ..., 6 = Суббота
 }
 
 export default function Darslar() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: "", time: "", topic: "" });
+  const [formData, setFormData] = useState({ name: "", time: "", topic: "", days: [1, 2, 3, 4, 5, 6, 0] });
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const weekDays = [
+    { id: 1, name: "Du", full: "Dushanba" },
+    { id: 2, name: "Se", full: "Seshanba" },
+    { id: 3, name: "Ch", full: "Chorshanba" },
+    { id: 4, name: "Pa", full: "Payshanba" },
+    { id: 5, name: "Ju", full: "Juma" },
+    { id: 6, name: "Sh", full: "Shanba" },
+    { id: 0, name: "Ya", full: "Yakshanba" },
+  ];
 
   useEffect(() => {
     const saved = localStorage.getItem("nafs-lessons");
@@ -37,16 +48,23 @@ export default function Darslar() {
 
   const getCurrentLesson = () => {
     const now = currentTime.getHours() * 60 + currentTime.getMinutes();
+    const currentDay = currentTime.getDay();
     return lessons.find((lesson) => {
       const [hours, minutes] = lesson.time.split(":").map(Number);
       const lessonTime = hours * 60 + minutes;
-      return Math.abs(lessonTime - now) < 60 && !lesson.completed;
+      const isToday = lesson.days?.includes(currentDay) ?? true;
+      return Math.abs(lessonTime - now) < 60 && !lesson.completed && isToday;
     });
   };
 
   const addOrUpdateLesson = () => {
     if (!formData.name || !formData.time) {
       toast.error("Iltimos, barcha maydonlarni to'ldiring");
+      return;
+    }
+
+    if (formData.days.length === 0) {
+      toast.error("Kamida bitta kun tanlang");
       return;
     }
 
@@ -67,7 +85,7 @@ export default function Darslar() {
       toast.success("Dars qo'shildi");
     }
 
-    setFormData({ name: "", time: "", topic: "" });
+    setFormData({ name: "", time: "", topic: "", days: [1, 2, 3, 4, 5, 6, 0] });
     setShowForm(false);
     setEditingId(null);
   };
@@ -87,8 +105,21 @@ export default function Darslar() {
 
   const startEdit = (lesson: Lesson) => {
     setEditingId(lesson.id);
-    setFormData({ name: lesson.name, time: lesson.time, topic: lesson.topic });
+    setFormData({ 
+      name: lesson.name, 
+      time: lesson.time, 
+      topic: lesson.topic,
+      days: lesson.days || [1, 2, 3, 4, 5, 6, 0]
+    });
     setShowForm(true);
+  };
+
+  const toggleDay = (dayId: number) => {
+    if (formData.days.includes(dayId)) {
+      setFormData({ ...formData, days: formData.days.filter(d => d !== dayId) });
+    } else {
+      setFormData({ ...formData, days: [...formData.days, dayId] });
+    }
   };
 
   const currentLesson = getCurrentLesson();
@@ -120,7 +151,7 @@ export default function Darslar() {
           onClick={() => {
             setShowForm(!showForm);
             setEditingId(null);
-            setFormData({ name: "", time: "", topic: "" });
+            setFormData({ name: "", time: "", topic: "", days: [1, 2, 3, 4, 5, 6, 0] });
           }}
           className="w-full mb-4 bg-gradient-primary"
         >
@@ -146,6 +177,28 @@ export default function Darslar() {
                 value={formData.topic}
                 onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
               />
+              
+              <div>
+                <label className="text-sm font-medium mb-2 block">Qaysi kunlarda?</label>
+                <div className="flex gap-2 flex-wrap">
+                  {weekDays.map((day) => (
+                    <button
+                      key={day.id}
+                      type="button"
+                      onClick={() => toggleDay(day.id)}
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-smooth ${
+                        formData.days.includes(day.id)
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      }`}
+                      title={day.full}
+                    >
+                      {day.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex gap-2">
                 <Button onClick={addOrUpdateLesson} className="flex-1 bg-gradient-primary">
                   <Check className="w-4 h-4 mr-2" />
@@ -156,7 +209,7 @@ export default function Darslar() {
                   onClick={() => {
                     setShowForm(false);
                     setEditingId(null);
-                    setFormData({ name: "", time: "", topic: "" });
+                    setFormData({ name: "", time: "", topic: "", days: [1, 2, 3, 4, 5, 6, 0] });
                   }}
                 >
                   Bekor qilish
@@ -180,7 +233,7 @@ export default function Darslar() {
                     onCheckedChange={() => toggleComplete(lesson.id)}
                     className="data-[state=checked]:bg-success data-[state=checked]:border-success"
                   />
-                  <div className="flex-1">
+                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-primary">{lesson.time}</span>
                       <span className={lesson.completed ? "line-through text-muted-foreground" : ""}>
@@ -189,6 +242,21 @@ export default function Darslar() {
                     </div>
                     {lesson.topic && (
                       <p className="text-sm text-muted-foreground mt-1">{lesson.topic}</p>
+                    )}
+                    {lesson.days && lesson.days.length < 7 && (
+                      <div className="flex gap-1 mt-2">
+                        {weekDays
+                          .filter(day => lesson.days.includes(day.id))
+                          .map(day => (
+                            <span 
+                              key={day.id} 
+                              className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground"
+                              title={day.full}
+                            >
+                              {day.name}
+                            </span>
+                          ))}
+                      </div>
                     )}
                   </div>
                   <button
